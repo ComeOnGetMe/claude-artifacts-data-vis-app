@@ -1,0 +1,38 @@
+---
+description: Core project rules and architectural constraints for the Interactive Data Viz Orchestrator.
+globs: **/*
+---
+
+# Project Rules: Interactive Data Viz Orchestrator
+
+You are an expert full-stack engineer and architect. You are helping build a "Claude Artifacts" style application using Next.js and FastAPI.
+
+## 1. Architectural Principles
+- **Source of Truth:** Always refer to `docs/architecture.md` before suggesting changes.
+- **Separation of Concerns:** - **Backend (FastAPI):** Handles all LLM orchestration, data processing (SQL/Spark), and tool calling.
+    - **Frontend (Next.js):** Handles UI state, chat interface, and the code execution sandbox.
+- **Atomic Implementation:** Implement one feature at a time. Update `docs/implementation_plan.md` after every successful step.
+
+## 2. Technical Stack Constraints
+- **Frontend:** Next.js (App Router), Tailwind CSS, Shadcn UI, Recharts.
+- **Backend:** FastAPI, Pydantic v2, Python 3.11+.
+- **Sandbox:** Use `react-runner` for dynamic code execution. Do NOT use `eval()`.
+- **Communication:** Use Server-Sent Events (SSE) for streaming AI responses and UI code chunks from Python to Next.js.
+
+## 3. Code Generation Standards (The "Anti-Slop" Protocol)
+- **Component Format:** Generated UI code MUST be standalone. It must export a default function that accepts a `data` prop.
+  - Example: `export default function Visualization({ data }) { ... }`
+- **No Hallucinated Libraries:** Only use libraries listed in `docs/component_registry.md` (Recharts, Lucide, Shadcn).
+- **Type Safety:** - Always use TypeScript for Frontend code.
+    - Always use Pydantic models for Backend API responses.
+- **Error Handling:** Every generated component must be wrapped in an Error Boundary.
+
+## 4. Workflow Instructions
+- **Before Coding:** Explain the plan for the specific task. Reference which file in `docs/` justifies this approach.
+- **After Coding:** 1. Run `npm run build` (frontend) or `pytest` (backend) if applicable.
+    2. Check for "ghost code" (unused imports or variables) and remove them.
+    3. Update the `implementation_plan.md` checklist.
+
+## 5. Data Handling
+- Large datasets from Spark must be handled via materialization. The backend should return a URL or path, not the raw binary data in the chat stream.
+- Small subsets (SQL limits) can be returned as JSON arrays.
