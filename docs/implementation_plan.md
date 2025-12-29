@@ -2,7 +2,7 @@
 
 ## Phase 1: The Foundation (Monorepo Setup)
 
-[ ] Step 1: Project Scaffolding
+[x] Step 1: Project Scaffolding
 
 Initialize /frontend (Next.js, Tailwind, Shadcn).
 
@@ -32,25 +32,6 @@ Frontend:
 Install react-runner in the frontend.
 
 Create a Preview component that takes a string of code and renders it inside an Error Boundary.
-
-[ ] Step 3.1: Security Measures for Code Execution
-
-Implement code validation:
-
-- Parse generated code AST to validate imports (only allow Recharts, Shadcn, Lucide)
-- Reject code with forbidden patterns (fetch, localStorage, eval, etc.)
-- Validate component signature matches contract: `export default function Viz({ data, params })`
-
-Sandbox isolation:
-
-- Wrap react-runner in iframe for additional isolation (optional but recommended)
-- Set Content Security Policy headers
-- Implement execution timeout (e.g., 5 seconds max render time)
-
-Security utilities:
-
-- Create `/frontend/lib/security/codeValidator.ts` for import/pattern validation
-- Add unit tests for security checks
 
 [ ] Step 4: The Parser Utility
 
@@ -89,6 +70,27 @@ Register tools with PydanticAI agent:
 [ ] Step 6: The System Prompt
 
 Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write code that uses the data prop.
+
+## Phase 3.1: Security
+
+[ ] Step 6.1: Security Measures for Code Execution
+
+Implement code validation:
+
+- Parse generated code AST to validate imports (only allow Recharts, Shadcn, Lucide)
+- Reject code with forbidden patterns (fetch, localStorage, eval, etc.)
+- Validate component signature matches contract: `export default function Viz({ data, params })`
+
+Sandbox isolation:
+
+- Wrap react-runner in iframe for additional isolation (optional but recommended)
+- Set Content Security Policy headers
+- Implement execution timeout (e.g., 5 seconds max render time)
+
+Security utilities:
+
+- Create `/frontend/lib/security/codeValidator.ts` for import/pattern validation
+- Add unit tests for security checks
 
 ## Phase 4: Persistence & Polish
 
