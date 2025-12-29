@@ -64,9 +64,25 @@ Register tools with PydanticAI agent:
 - Create tool implementations that call actual data APIs
 - Add tool descriptions for LLM to understand when to use each
 
-[ ] Step 6: The System Prompt
+## Phase 3 End-to-end integration
 
-Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write code that uses the data prop.
+[ ] Step 5.2 end-to-end integration with mock
+
+Go through all components with mock data as a tracer bullet:
+
+1. Simulates chat messages without the LLM client
+2. Simulate LLM response that contains SQL code block and tool call and query output
+3. Simulate LLM response that generates mock UI code
+4. Simulate frontend rendering of the mock UI and mock data
+
+[ ] Step 5.3: The LLM Client
+
+- Implements the LLM client using PydanticAI with the tools and connects it with the /chat endpoint
+- Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write code that uses the data prop.
+
+[ ] Step 5.4: Real integration test
+
+Connects the LLM client with everything and simulate a real user interaction - translate prompt into SQL, run tool call, generate UI code, and renders.
 
 ## Phase 3.1: Security
 
