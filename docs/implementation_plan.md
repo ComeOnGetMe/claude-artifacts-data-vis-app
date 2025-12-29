@@ -18,7 +18,6 @@ Backend:
   - Create a test that sends arbitrary text input and verify the response
 - Create a /query/local_duckdb endpoint using a local duckdb worker (python subprocess) for debugging
   - Create a test that send a trivial SQL and verify response
-- Create a /generate-ui endpoint that translates user prompt to UI code; return example UI code for now
 
 Frontend:
 
@@ -31,7 +30,7 @@ Frontend:
 
 Install react-runner in the frontend.
 
-Create a Preview component that takes a string of code and renders it inside an Error Boundary.
+Create a Preview component that takes a string of code and renders it inside an Error Boundary. Create a simple snippet to test this
 
 [ ] Step 4: The Parser Utility
 
@@ -52,14 +51,12 @@ Backend: Create a mock tool get_sales_data() that returns a hardcoded JSON array
 Define Pydantic models for tools:
 
 - `RunSQLTool`: `query: str`, `limit: int = 1000`, `data_source: Literal["duckdb"]`
-- `SubmitSparkTool`: `query: str`, `output_format: Literal["parquet", "csv"] = "parquet"`
 - `QueryResult`: `columns: List[str]`, `rows: List[List[Any]]`, `row_count: int`
 
 Implement tool functions:
 
 - `run_sql(query, limit)` - Execute SQL and return JSON array (small subsets)
-- `submit_spark(query, format)` - Submit to Spark cluster, return materialized file URL
-- Both tools return `QueryResult` or `SparkJobResult` Pydantic models
+- Tool returns `QueryResult` Pydantic model
 
 Register tools with PydanticAI agent:
 

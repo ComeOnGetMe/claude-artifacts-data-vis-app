@@ -15,7 +15,6 @@ A full-stack application using **Next.js** for the interactive "Artifact" fronte
 * **Data Execution**:  (already provided by external services)
     * **Local DuckDB**: for debugging purposes
     * **Distributed DuckDB:** For immediate "Small Subset" SQL execution.
-    * **PySpark:** For submitting jobs to remote Spark clusters.
 
 ## 3. Agent Workflow & SQL Translation
 
@@ -30,22 +29,25 @@ The agent uses **PydanticAI** with tool-calling capabilities. The SQL translatio
 2. **Agent receives & analyzes** → PydanticAI agent processes the prompt:
    - Understands user intent (e.g., "Show sales by region")
    - **Translates natural language to SQL** (happens in agent's reasoning)
-   - Decides which tool to call (`run_sql` for small data, `submit_spark` for large)
+   - **Infers expected data structure** from the SQL query (column names, types, aggregation patterns)
 
-3. **Agent calls data tool** → Agent invokes `run_sql(query, limit)` or `submit_spark(query)`:
-   - Tool receives SQL query string
-   - Executes SQL against DuckDB/Spark
-   - Returns `QueryResult` with columns and rows
-
-4. **Agent generates UI code** → Agent receives data results:
-   - Analyzes data structure (columns, types, sample rows)
-   - Generates React/TypeScript code using Recharts + Shadcn
+3. **Agent generates UI code immediately** → Agent generates React/TypeScript code **while** data executes:
+   - Analyzes the SQL query structure to predict data shape (columns, types, relationships)
+   - Generates React/TypeScript code using Recharts + Shadcn based on expected structure
    - Streams code chunks via SSE as they're generated
+   - Code includes placeholder/loading states for when data arrives
 
-5. **Frontend renders** → Frontend receives:
-   - Data URL or JSON payload
-   - Complete UI code
-   - Renders component in sandbox with data
+4. **Agent calls data tool (parallel or after code generation)** → Agent invokes `run_sql(query, limit)`:
+   - Tool receives SQL query string
+   - Executes SQL against DuckDB (may happen in parallel with code streaming)
+   - Returns `QueryResult` with columns and rows
+   - If actual data structure differs significantly, agent may stream code updates
+
+5. **Frontend renders progressively** → Frontend receives:
+   - UI code chunks (streamed first)
+   - Renders component skeleton/loading state immediately
+   - Data URL or JSON payload (arrives after or during code streaming)
+   - Updates component with actual data when available
 
 ### How SQL Translation Works:
 
@@ -54,17 +56,19 @@ The SQL translation happens **inside the PydanticAI agent** through:
 1. **System Prompt**: Instructs the LLM about:
    - Available database schemas/tables (provided as context)
    - SQL syntax and best practices
-   - When to use `run_sql` vs `submit_spark`
    - How to interpret user requests and translate to SQL
+   - **Generate UI code immediately** based on expected data structure from SQL query
    
    Example system prompt excerpt:
 
    ```text
    You are a data analyst assistant. When users ask questions about data:
    1. Analyze their request and determine what SQL query is needed
-   2. Use run_sql() for queries that return < 1000 rows (fast, immediate results)
-   3. Use submit_spark() for large aggregations or full table scans
-   4. Always include appropriate WHERE clauses and LIMITs
+   2. Use run_sql() for executing queries (fast, immediate results)
+   3. Always include appropriate WHERE clauses and LIMITs
+   4. **Generate UI code immediately** after determining the SQL query, based on the expected
+      data structure (column names, types, aggregation patterns). Do not wait for query execution.
+      Include loading/placeholder states in the generated component.
    
    Available tables: sales (region, amount, date), products (id, name, category)
    ```
@@ -86,25 +90,6 @@ The SQL translation happens **inside the PydanticAI agent** through:
 
    The PydanticAI framework ensures the agent provides a valid SQL string before the tool executes.
 
-### Alternative: Separate Endpoints (For Development/Testing)
-
-For development, you may want separate endpoints:
-
-- `/query-understanding`: Pure SQL translation (no execution)
-- `/generate-ui`: Pure UI code generation (no data fetching)
-
-These are useful for:
-
-- Testing individual components
-- Debugging SQL generation separately
-- Iterative development
-
-**But in production**, the unified `/chat` endpoint with tool-calling is recommended because:
-
-- Agent can adapt based on actual data results
-- More efficient (single LLM orchestration)
-- Better error handling (agent can retry with corrected SQL)
-
 ### Example Workflow:
 
 **User Prompt:** "Show me sales by region for Q1 2024"
@@ -114,7 +99,10 @@ These are useful for:
 ```text
 1. [thought] "User wants sales data grouped by region for Q1 2024"
 2. [thought] "I need to query a sales table. This seems like a small query, I'll use run_sql"
-3. [tool_call] run_sql(
+3. [thought] "The SQL will return: region (string) and total_sales (number). 
+              I'll create a bar chart using Recharts. I'll generate the UI code now."
+4. [code] Streams React component code with BarChart (includes loading state)...
+5. [tool_call] run_sql(
      query="SELECT region, SUM(amount) as total_sales 
             FROM sales 
             WHERE date >= '2024-01-01' AND date < '2024-04-01' 
@@ -122,21 +110,23 @@ These are useful for:
             ORDER BY total_sales DESC",
      limit=1000
    )
-4. [tool_result] QueryResult(columns=['region', 'total_sales'], rows=[...])
-5. [thought] "Data has 2 columns: region (string) and total_sales (number). 
-              I'll create a bar chart using Recharts"
-6. [code] Streams React component code with BarChart...
+6. [tool_result] QueryResult(columns=['region', 'total_sales'], rows=[...])
+7. [data] Streams data_ready event with data URL or JSON payload
 ```
 
-**Key Point:** The SQL translation (step 3) happens **inside the agent** when it decides to call the `run_sql` tool. The agent's LLM generates the SQL query string as part of its tool-calling decision.
+**Key Points:** 
+- The SQL translation (step 5) happens **inside the agent** when it decides to call the `run_sql` tool.
+- **UI code generation (step 4) happens immediately** after the agent determines the SQL query structure, before data execution.
+- The agent infers the expected data structure from the SQL query itself (SELECT columns, aggregations, etc.).
+- Data execution may happen in parallel with code streaming, or after code generation completes.
 
 ## 4. System Components
 
 ### A. FastAPI Orchestrator (`/backend`)
 
-* **Agent Logic:** Uses PydanticAI to define "Tools" (e.g., `run_sql`, `submit_spark`).
+* **Agent Logic:** Uses PydanticAI to define "Tools" (e.g., `run_sql`).
 * **Artifact Generator:** A specialized endpoint `/generate-ui` that streams back React code blocks.
-* **Data Proxy:** Acts as a secure gateway to your Spark/SQL clusters.
+* **Data Proxy:** Acts as a secure gateway to your SQL clusters.
 
 ### B. Next.js Frontend (`/frontend`)
 
@@ -152,7 +142,7 @@ These are useful for:
 ├── backend/              # FastAPI App
 │   ├── api/              # Routes (chat, data, templates)
 │   ├── agents/           # LLM logic & PydanticAI tools
-│   ├── core/             # Spark/SQL connection logic
+│   ├── core/             # SQL connection logic
 │   └── main.py           # Entry point
 ├── docs/                 # Architecture & Requirements
 └── .cursor/rules/        # Agent instructions
@@ -248,7 +238,7 @@ Templates are stored as JSON objects with the following structure:
     "chart_type": "bar",
     "color_scheme": "default"
   },
-  "data_source": "spark" | "duckdb",
+  "data_source": "duckdb",
   "data_url": "/api/data/abc123" | null,
   "created_at": "2024-01-01T00:00:00Z",
   "updated_at": "2024-01-01T00:00:00Z"
@@ -262,7 +252,7 @@ Templates are stored as JSON objects with the following structure:
 ### Backend (Pydantic):
 
 - All API responses use Pydantic v2 models
-- Tool definitions (run_sql, submit_spark) use Pydantic BaseModel
+- Tool definitions (run_sql) use Pydantic BaseModel
 - Query results typed as `QueryResult` model with `columns: List[str]` and `rows: List[List[Any]]`
 
 ### Frontend (TypeScript/Zod):
