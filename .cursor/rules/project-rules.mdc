@@ -36,3 +36,7 @@ You are an expert full-stack engineer and architect. You are helping build a "Cl
 ## 5. Data Handling
 - Large datasets from Spark must be handled via materialization. The backend should return a URL or path, not the raw binary data in the chat stream.
 - Small subsets (SQL limits) can be returned as JSON arrays.
+
+## 6. Testing
+
+- For Python code, always use project virtual environment interpreter located at /backend/.venv/bin/python

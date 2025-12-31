@@ -4,6 +4,8 @@ FastAPI backend entry point for Interactive Data Viz Orchestrator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api import chat, query
+
 app = FastAPI(
     title="Interactive Data Viz Orchestrator API",
     description="Backend API for data visualization orchestration",
@@ -18,6 +20,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register routers
+app.include_router(chat.router)
+app.include_router(query.router)
 
 
 @app.get("/")

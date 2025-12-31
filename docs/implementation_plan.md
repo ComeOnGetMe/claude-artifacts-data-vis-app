@@ -10,7 +10,7 @@ Initialize /backend (FastAPI, Uvicorn, Postgres).
 
 Create a shared docker-compose.yml to run frontend, backend, DB containers.
 
-[ ] Step 2: The Communication Bridge
+[x] Step 2: The Communication Bridge
 
 Backend:
 
@@ -141,17 +141,20 @@ Setup a simple SQLite or Supabase table to save "Templates" (The original prompt
 [ ] Step 8.1: Frontend State Management
 
 Design state architecture:
+
 - Chat messages: Array of `{ role: "user" | "assistant", content: string, timestamp }`
 - Active artifact: `{ code: string, dataUrl: string | null, params: object }`
 - Conversation history: Array of previous artifacts/messages
 - Loading states: `{ isGenerating: boolean, isFetchingData: boolean, stage: string }`
 
 Choose state management solution:
+
 - Option A: React Context API (`ChatContext`, `ArtifactContext`)
 - Option B: Zustand store (`useChatStore`, `useArtifactStore`)
 - Recommendation: Start with Context, migrate to Zustand if complexity grows
 
 Implement state persistence:
+
 - Save conversation history to localStorage (optional: sync to backend)
 - Implement "Clear History" functionality
 - Handle state restoration on page reload
