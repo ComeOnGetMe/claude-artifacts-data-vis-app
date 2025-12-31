@@ -14,7 +14,7 @@ A full-stack application using **Next.js** for the interactive "Artifact" fronte
     * **SSE (Server-Sent Events):** For streaming AI thoughts and UI code chunks.
 * **Data Execution**:  (already provided by external services)
     * **Local DuckDB**: for debugging purposes
-    * **Distributed DuckDB:** For immediate "Small Subset" SQL execution.
+    * **Distributed DuckDB:** For immediate SQL execution (all queries return small result sets).
 
 ## 3. Agent Workflow & SQL Translation
 
@@ -44,10 +44,10 @@ The agent uses **PydanticAI** with tool-calling capabilities. The SQL translatio
    - If actual data structure differs significantly, agent may stream code updates
 
 5. **Frontend renders progressively** → Frontend receives:
-   - UI code chunks (streamed first)
-   - Renders component skeleton/loading state immediately
-   - Data URL or JSON payload (arrives after or during code streaming)
-   - Updates component with actual data when available
+   - UI code chunks (streamed as they're generated)
+   - Data payload (streamed directly when query completes)
+   - Frontend infers readiness from event patterns (no backend state tracking)
+   - Renders component skeleton when code chunks arrive, updates with data when `data` event arrives
 
 ### How SQL Translation Works:
 
@@ -111,7 +111,8 @@ The SQL translation happens **inside the PydanticAI agent** through:
      limit=1000
    )
 6. [tool_result] QueryResult(columns=['region', 'total_sales'], rows=[...])
-7. [data] Streams data_ready event with data URL or JSON payload
+7. [data] Streams data payload directly: {"type": "data", "payload": {"columns": [...], "rows": [...]}}
+8. [stream closes] Backend finishes - frontend infers code completion from event pattern
 ```
 
 **Key Points:** 
@@ -119,13 +120,15 @@ The SQL translation happens **inside the PydanticAI agent** through:
 - **UI code generation (step 4) happens immediately** after the agent determines the SQL query structure, before data execution.
 - The agent infers the expected data structure from the SQL query itself (SELECT columns, aggregations, etc.).
 - Data execution may happen in parallel with code streaming, or after code generation completes.
+- **Backend is stateless**: It streams events as they occur, frontend infers completion from event patterns (no status events needed).
 
 ## 4. System Components
 
 ### A. FastAPI Orchestrator (`/backend`)
 
 * **Agent Logic:** Uses PydanticAI to define "Tools" (e.g., `run_sql`).
-* **Artifact Generator:** A specialized endpoint `/generate-ui` that streams back React code blocks.
+* **Stateless Streaming:** Processes LLM output and tool results, streams events as they occur.
+* **No State Tracking:** Backend doesn't track completion status - just processes and streams events.
 * **Data Proxy:** Acts as a secure gateway to your SQL clusters.
 
 ### B. Next.js Frontend (`/frontend`)
@@ -178,14 +181,16 @@ data: <json_payload>
 }
 ```
 
-**`data`** - Data ready notification
+**`data`** - Data returned by query engine (streamed directly)
 
 ```json
 {
-  "type": "data_ready",
-  "url": "/api/data/abc123",
-  "size": "small" | "large",
-  "format": "json" | "parquet"
+  "type": "data",
+  "payload": {
+    "columns": ["region", "total_sales"],
+    "rows": [["North", 1000], ["South", 2000]],
+    "row_count": 2
+  }
 }
 ```
 
@@ -199,17 +204,48 @@ data: <json_payload>
 }
 ```
 
-**`done`** - Stream complete
+**Note on Event Completion:**
+- The backend is **stateless** - it simply streams events as they occur from LLM output and tool results
+- **Data readiness**: Signaled by the arrival of the `data` event itself
+- **Code completion**: Frontend infers from event patterns:
+  - When `code` events stop and a different event type arrives (e.g., `data`, `thought`)
+  - When the stream closes (all events have been sent)
+  - Frontend can render progressively as code chunks arrive, updating when data becomes available
+- No backend state tracking needed - backend just processes and streams events
 
-```json
-{
-  "type": "complete",
-  "code_complete": true,
-  "data_ready": true
-}
-```
+## 7. Frontend-Controlled Rendering Readiness
 
-## 7. Parameterization Timing & Behavior
+### Rendering Control:
+
+The frontend controls when to render components by tracking readiness independently. The backend streams events asynchronously, and the frontend decides when both code and data are ready.
+
+### State Tracking (Frontend-Only):
+
+The frontend tracks readiness by observing event patterns - no backend state required:
+
+- **Code State:** 
+  - Accumulate code chunks from `code` events
+  - Infer `codeComplete: true` when:
+    - Code events stop and a different event type arrives (e.g., `data` event)
+    - Stream closes (all events sent)
+    - Or use a timeout heuristic (e.g., no code events for 500ms)
+- **Data State:** 
+  - Store data payload from `data` event
+  - Set `dataReady: true` immediately when `data` event arrives
+- **Rendering Logic:**
+  - If `hasCodeChunks && !dataReady`: Render component with loading/placeholder state
+  - If `hasCodeChunks && dataReady`: Render component with actual data
+  - If `!hasCodeChunks && dataReady`: Store data, wait for code (or render as table fallback)
+
+### Benefits:
+
+- **Stateless backend**: Backend doesn't track completion state - just processes and streams events
+- **Progressive rendering**: Show UI skeleton immediately when code chunks arrive
+- **Handles race conditions**: Code and data can arrive in any order
+- **Better UX**: Users see progress as components become ready
+- **Simpler architecture**: Frontend orchestrates everything based on event observation
+
+## 8. Parameterization Timing & Behavior
 
 ### States:
 
@@ -220,10 +256,12 @@ data: <json_payload>
 ### Implementation:
 
 - Debounce parameter changes (300ms) to avoid excessive re-renders
-- Maintain separate state for: `isGenerating`, `generatedCode`, `currentParams`, `dataUrl`
+- Maintain separate state for: `isGenerating`, `generatedCode`, `currentParams`, `data`
+- Track readiness independently: `codeComplete`, `dataReady`
+- Frontend controls when to render based on readiness state
 - Parameter changes trigger component re-mount with updated `params` prop only
 
-## 8. Template Format Schema
+## 9. Template Format Schema
 
 Templates are stored as JSON objects with the following structure:
 
@@ -239,7 +277,11 @@ Templates are stored as JSON objects with the following structure:
     "color_scheme": "default"
   },
   "data_source": "duckdb",
-  "data_url": "/api/data/abc123" | null,
+  "data": {
+    "columns": ["region", "total_sales"],
+    "rows": [["North", 1000], ["South", 2000]],
+    "row_count": 2
+  },
   "created_at": "2024-01-01T00:00:00Z",
   "updated_at": "2024-01-01T00:00:00Z"
 }
@@ -247,7 +289,7 @@ Templates are stored as JSON objects with the following structure:
 
 **Storage:** Backend persists templates in Postgres. Frontend can load templates via REST API.
 
-## 9. Type Safety & Schema Alignment
+## 10. Type Safety & Schema Alignment
 
 ### Backend (Pydantic):
 
@@ -268,7 +310,7 @@ Templates are stored as JSON objects with the following structure:
 3. Generate TypeScript interfaces from schemas (or manually maintain)
 4. Create corresponding Zod schemas for runtime validation
 
-## 10. Development Standards
+## 11. Development Standards
 
 Modular UI: Generated code must be a default export: `export default function Viz({ data, params }) { ... }`.
 

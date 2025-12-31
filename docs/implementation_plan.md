@@ -17,12 +17,29 @@ Backend:
 - Create a /chat endpoint using StreamingResponse that sends "Hello World" chunks.
   - Create a test that sends arbitrary text input and verify the response
 - Create a /query/local_duckdb endpoint using a local duckdb worker (python subprocess) for debugging
+  - Implement a Pydantic model for a "Query Result" (columns and rows)
   - Create a test that send a trivial SQL and verify response
 
 Frontend:
 
 - Create a basic chat input that consumes the stream using the fetch API and displays it.
+  - Create a handler for text events and displays it
   - Create tests for starting and continuing a multi-turn conversation
+
+[ ] Step 2.1: The UI component
+
+- Create a handler for `data` event that stores the data payload directly (no URL fetching)
+- Create a handler for `code` event that accumulates code chunks
+- Frontend infers code completion from event patterns:
+  - When `code` events stop and a different event type arrives (e.g., `data` event)
+  - When stream closes (all events sent)
+  - Optionally: timeout heuristic (no code events for 500ms)
+- Frontend tracks readiness independently: `hasCodeChunks` and `dataReady` (from arrival of data event)
+- Backend remains stateless - just streams events as they occur from LLM/tools
+- Rendering logic:
+  - When code is complete but data not ready: render component with loading/placeholder state
+  - When both are ready: render component with actual data
+  - When there is no UI code yet, render the data as a table by default 
 
 ## Phase 2: The Sandbox (The "Artifact" UI)
 
@@ -40,12 +57,6 @@ Connect the Parser to the Preview window so code appears as it streams.
 
 ## Phase 3: Data Integration (The "Agent" Logic)
 
-[ ] Step 5: Mock Data Tool
-
-Backend: Implement a Pydantic model for a "Query Result" (columns and rows).
-
-Backend: Create a mock tool get_sales_data() that returns a hardcoded JSON array.
-
 [ ] Step 5.1: Backend Tool Definitions
 
 Define Pydantic models for tools:
@@ -55,8 +66,9 @@ Define Pydantic models for tools:
 
 Implement tool functions:
 
-- `run_sql(query, limit)` - Execute SQL and return JSON array (small subsets)
+- `run_sql(query, limit)` - Execute SQL and return `QueryResult` with columns and rows
 - Tool returns `QueryResult` Pydantic model
+- All queries are assumed to return small result sets (streamed directly in SSE)
 
 Register tools with PydanticAI agent:
 
@@ -130,8 +142,7 @@ Implement data refresh mechanism:
 
 Cache invalidation strategy:
 
-- Small data (JSON): Cache for 5 minutes, allow manual refresh
-- Large data (Parquet): Cache until user explicitly refreshes
+- Data is cached in frontend state for 5 minutes, allow manual refresh
 - Store cache keys in frontend state for refresh requests
 
 [ ] Step 8: Template Saving
@@ -143,9 +154,10 @@ Setup a simple SQLite or Supabase table to save "Templates" (The original prompt
 Design state architecture:
 
 - Chat messages: Array of `{ role: "user" | "assistant", content: string, timestamp }`
-- Active artifact: `{ code: string, dataUrl: string | null, params: object }`
+- Active artifact: `{ code: string, codeComplete: boolean, data: QueryResult | null, dataReady: boolean, params: object }`
 - Conversation history: Array of previous artifacts/messages
-- Loading states: `{ isGenerating: boolean, isFetchingData: boolean, stage: string }`
+- Loading states: `{ isGenerating: boolean, stage: string }`
+- Frontend controls rendering readiness by tracking `codeComplete` and `dataReady` independently
 
 Choose state management solution:
 
