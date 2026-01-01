@@ -14,7 +14,12 @@ export interface Message {
   code?: string;
 }
 
-export default function Chat() {
+interface ChatProps {
+  onCodeUpdate?: (code: string | null) => void;
+  onDataUpdate?: (data: QueryResult | null) => void;
+}
+
+export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -57,6 +62,9 @@ export default function Chat() {
     setCurrentData(null);
     accumulatedThoughtRef.current = '';
     accumulatedCodeRef.current = '';
+    // Clear preview when starting new request
+    onCodeUpdate?.(null);
+    onDataUpdate?.(null);
 
     await streamChat(userMessage.content, {
       onThought: (content) => {
@@ -66,9 +74,13 @@ export default function Chat() {
       onCodeChunk: (chunk) => {
         accumulatedCodeRef.current += chunk;
         setCurrentCodeChunks(accumulatedCodeRef.current);
+        // Update preview with latest code
+        onCodeUpdate?.(accumulatedCodeRef.current);
       },
       onData: (payload) => {
         setCurrentData(payload);
+        // Update preview with latest data
+        onDataUpdate?.(payload);
         // Add data message immediately
         setMessages((prev) => [
           ...prev,
@@ -99,6 +111,9 @@ export default function Chat() {
         setCurrentData(null);
         accumulatedThoughtRef.current = '';
         accumulatedCodeRef.current = '';
+        // Clear preview on error
+        onCodeUpdate?.(null);
+        onDataUpdate?.(null);
       },
       onStreamComplete: () => {
         // Add final messages for thought and code if they exist
@@ -121,6 +136,8 @@ export default function Chat() {
             type: 'code',
             code: accumulatedCodeRef.current,
           });
+          // Ensure preview has final code
+          onCodeUpdate?.(accumulatedCodeRef.current);
         }
         
         if (newMessages.length > 0) {
@@ -138,7 +155,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
+    <div className="flex flex-col h-full p-4">
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {messages.map((message, index) => (
           <div
