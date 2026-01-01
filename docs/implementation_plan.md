@@ -54,15 +54,16 @@ Create a Preview component that takes a string of code and renders it inside an 
 
 Update the sample code to be a simple Bar chart and the sample data to be a simple 2-column table of sales and regions; then make sure the generated UI can render the data accordingly
 
-[ ] Step 4: The Parser Utility
+## Phase 3: LLM Agent
 
-Write a utility to extract code blocks from the AI's markdown response (e.g., extracting content between ```tsx blocks).
+[ ] Step 4: The LLM Client
 
-Connect the Parser to the Preview window so code appears as it streams.
+- Implements the LLM client using PydanticAI and connects it with the /chat endpoint
+  - Use Amazon Bedrock client together with PydanticAI
+- Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write UI code that renders the data.
+- Test both the client and the endpoint with basic prompts like "generate a SQL to calculate sales by region assuming a simple table schema"
 
-## Phase 3: Data Integration (The "Agent" Logic)
-
-[ ] Step 5.1: Backend Tool Definitions
+[ ] Step 4.2: Backend Tool Definitions
 
 Define Pydantic models for tools:
 
@@ -81,27 +82,34 @@ Register tools with PydanticAI agent:
 - Create tool implementations that call actual data APIs
 - Add tool descriptions for LLM to understand when to use each
 
-## Phase 3 End-to-end integration
+Test tool use with prompt "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'"
 
-[ ] Step 5.2 end-to-end integration with mock
+Test UI code generation and verify if output is runnable.
 
-Go through all components with mock data as a tracer bullet:
+## Phase 4: Agent integration
 
-1. Simulates chat messages without the LLM client
-2. Simulate LLM response that contains SQL code block and tool call and query output
-3. Simulate LLM response that generates mock UI code
-4. Simulate frontend rendering of the mock UI and mock data
+[ ] Step 4.1: The Parser Utility
 
-[ ] Step 5.3: The LLM Client
+Write a utility to extract code blocks from the AI's markdown response (e.g., extracting content between ```tsx blocks).
 
-- Implements the LLM client using PydanticAI with the tools and connects it with the /chat endpoint
-- Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write code that uses the data prop.
+Connect the Parser to the Preview window so code appears as it streams.
 
-[ ] Step 5.4: Real integration test
+Test if backend can extract code correctly
+
+[ ] Step 5: Real integration test
 
 Connects the LLM client with everything and simulate a real user interaction - translate prompt into SQL, run tool call, generate UI code, and renders.
 
-## Phase 3.1: Security
+Test the end-to-end workflow with the following scenarios:
+
+1. Basic hello world multi-turn conversations
+2. Generate SQL
+3. Tool use: ask to show top 5 rows from table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/part-00072-1617a3fc-7fe6-4606-928d-824fce963fe7-c000.snappy.parquet'. The result should be sent back as a data event and rendered as a plain table
+   1. aggregation: ask to show total number of rows in above table
+4. UI generation: ask to generate UI code. The result should be rendered as an empty artifact 
+5. Rendering: ask to show total row count from above table and render as a bar chart
+
+## Phase 5: Security
 
 [ ] Step 6.1: Security Measures for Code Execution
 
@@ -122,7 +130,7 @@ Security utilities:
 - Create `/frontend/lib/security/codeValidator.ts` for import/pattern validation
 - Add unit tests for security checks
 
-## Phase 4: Persistence & Polish
+## Phase 6: Persistence & Polish
 
 [ ] Step 7: Parameterization
 
