@@ -47,16 +47,32 @@ Using uv (recommended):
 ```bash
 cd backend
 # Install uv if you haven't: curl -LsSf https://astral.sh/uv/install.sh | sh
-uv pip install -r requirements.txt
+uv sync  # Installs dependencies from pyproject.toml
 uvicorn main:app --reload
 ```
 
 Or using pip:
 ```bash
 cd backend
-pip install -r requirements.txt
+pip install -e .
 uvicorn main:app --reload
 ```
+
+#### Environment Variables (Backend)
+
+For LLM agent functionality (Step 4+), configure AWS credentials:
+
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_REGION=us-east-1  # Optional, defaults to us-east-1
+export BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0  # Optional
+export USE_LLM_AGENT=true  # Set to false to use word-matching fallback
+```
+
+Or use AWS credentials file (`~/.aws/credentials`) or IAM role (if running on EC2).
+
+If AWS credentials are not configured, the backend will automatically fall back to word-matching mode for testing.
 
 ## Architecture
 

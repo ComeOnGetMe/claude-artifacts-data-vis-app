@@ -1,14 +1,112 @@
 """
 Tests for the /chat endpoint
 """
-import pytest
+import asyncio
 import json
+import pytest
+from unittest.mock import patch, MagicMock
+
 from httpx import AsyncClient, ASGITransport
 from main import app
 
 
+async def mock_stream_agent_response(agent, user_message: str):
+    """
+    Mock function that mimics stream_agent_response behavior for testing.
+    Uses word-matching logic to simulate LLM responses.
+    """
+    user_message_lower = user_message.lower()
+    
+    # If message contains "show data" or "data", send a data event
+    if "show data" in user_message_lower or "data" in user_message_lower:
+        yield {
+            "type": "thought",
+            "content": "I'll show you some sample data."
+        }
+        await asyncio.sleep(0.01)
+        
+        yield {
+            "type": "data",
+            "payload": {
+                "columns": ["region", "sales"],
+                "rows": [
+                    ["North", 1000],
+                    ["South", 2000],
+                    ["East", 1500],
+                    ["West", 1800]
+                ],
+                "row_count": 4
+            }
+        }
+        await asyncio.sleep(0.01)
+    
+    # If message contains "show code" or "code", send a code event
+    if "show code" in user_message_lower or "code" in user_message_lower:
+        yield {
+            "type": "thought",
+            "content": "I'll generate some UI code for you."
+        }
+        await asyncio.sleep(0.01)
+        
+        sample_code = """import React from 'react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+export default function Visualization({ data }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        No data available to visualize.
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 w-full h-full">
+      <h2 className="text-2xl font-bold mb-4">Sales by Region</h2>
+      <div className="w-full" style={{ height: '400px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="region" 
+              tick={{ fill: '#666' }}
+            />
+            <YAxis 
+              tick={{ fill: '#666' }}
+            />
+            <Tooltip />
+            <Bar dataKey="sales" fill="#3b82f6" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}"""
+        
+        # Split code into chunks to simulate streaming
+        chunk_size = 20
+        for i in range(0, len(sample_code), chunk_size):
+            chunk = sample_code[i:i + chunk_size]
+            yield {
+                "type": "code",
+                "language": "tsx",
+                "content": chunk
+            }
+            await asyncio.sleep(0.01)
+    
+    # Default: send a thought event if no specific keywords matched
+    if ("show data" not in user_message_lower and "data" not in user_message_lower and
+        "show code" not in user_message_lower and "code" not in user_message_lower):
+        yield {
+            "type": "thought",
+            "content": f"Received: {user_message}"
+        }
+
+
 @pytest.mark.asyncio
-async def test_chat_endpoint_streams_thought_event():
+@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
+@patch('api.chat._llm_agent', new_callable=MagicMock)
+async def test_chat_endpoint_streams_thought_event(mock_agent, mock_stream):
     """Test that /chat endpoint streams thought events for regular messages"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -49,7 +147,9 @@ async def test_chat_endpoint_streams_thought_event():
 
 
 @pytest.mark.asyncio
-async def test_chat_endpoint_streams_data_event():
+@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
+@patch('api.chat._llm_agent', new_callable=MagicMock)
+async def test_chat_endpoint_streams_data_event(mock_agent, mock_stream):
     """Test that /chat endpoint streams data events when message contains 'data'"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -92,7 +192,9 @@ async def test_chat_endpoint_streams_data_event():
 
 
 @pytest.mark.asyncio
-async def test_chat_endpoint_streams_code_event():
+@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
+@patch('api.chat._llm_agent', new_callable=MagicMock)
+async def test_chat_endpoint_streams_code_event(mock_agent, mock_stream):
     """Test that /chat endpoint streams code events when message contains 'code'"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -132,7 +234,9 @@ async def test_chat_endpoint_streams_code_event():
 
 
 @pytest.mark.asyncio
-async def test_chat_endpoint_with_different_messages():
+@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
+@patch('api.chat._llm_agent', new_callable=MagicMock)
+async def test_chat_endpoint_with_different_messages(mock_agent, mock_stream):
     """Test that /chat endpoint handles different message inputs"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         test_messages = [
@@ -156,4 +260,3 @@ async def test_chat_endpoint_with_different_messages():
             # Should receive at least a thought event
             assert "event:" in content
             assert "data:" in content
-

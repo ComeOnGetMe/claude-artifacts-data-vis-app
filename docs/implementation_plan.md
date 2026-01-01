@@ -56,7 +56,7 @@ Update the sample code to be a simple Bar chart and the sample data to be a simp
 
 ## Phase 3: LLM Agent
 
-[ ] Step 4: The LLM Client
+[x] Step 4: The LLM Client
 
 - Implements the LLM client using PydanticAI and connects it with the /chat endpoint
   - Use Amazon Bedrock client together with PydanticAI
