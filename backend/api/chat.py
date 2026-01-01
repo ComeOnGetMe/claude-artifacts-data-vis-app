@@ -44,14 +44,14 @@ async def chat(message: ChatMessage):
             yield f"event: thought\ndata: {json.dumps(thought_event)}\n\n"
             await asyncio.sleep(0.1)
             
-            # Send a data event with mock data
+            # Send a data event with mock data (2 columns: region, sales)
             mock_data = QueryResult(
-                columns=["region", "sales", "date"],
+                columns=["region", "sales"],
                 rows=[
-                    ["North", "1000", "2024-01-01"],
-                    ["South", "2000", "2024-01-02"],
-                    ["East", "1500", "2024-01-03"],
-                    ["West", "1800", "2024-01-04"]
+                    ["North", 1000],
+                    ["South", 2000],
+                    ["East", 1500],
+                    ["West", 1800]
                 ],
                 row_count=4
             )
@@ -72,12 +72,38 @@ async def chat(message: ChatMessage):
             yield f"event: thought\ndata: {json.dumps(thought_event)}\n\n"
             await asyncio.sleep(0.1)
             
-            # Send code chunks (simulating streaming)
-            sample_code = """export default function Visualization({ data }) {
+            # Send code chunks (simulating streaming) - Simple Bar chart
+            sample_code = """import React from 'react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+export default function Visualization({ data }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        No data available to visualize.
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Data Visualization</h2>
-      <p>This is a sample visualization component.</p>
+    <div className="p-4 w-full h-full">
+      <h2 className="text-2xl font-bold mb-4">Sales by Region</h2>
+      <div className="w-full" style={{ height: '400px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="region" 
+              tick={{ fill: '#666' }}
+            />
+            <YAxis 
+              tick={{ fill: '#666' }}
+            />
+            <Tooltip />
+            <Bar dataKey="sales" fill="#3b82f6" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }"""

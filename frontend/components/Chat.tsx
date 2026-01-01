@@ -62,9 +62,8 @@ export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
     setCurrentData(null);
     accumulatedThoughtRef.current = '';
     accumulatedCodeRef.current = '';
-    // Clear preview when starting new request
-    onCodeUpdate?.(null);
-    onDataUpdate?.(null);
+    // Don't clear preview code/data when starting new request
+    // This allows code and data from different submissions to persist
 
     await streamChat(userMessage.content, {
       onThought: (content) => {
@@ -74,7 +73,7 @@ export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
       onCodeChunk: (chunk) => {
         accumulatedCodeRef.current += chunk;
         setCurrentCodeChunks(accumulatedCodeRef.current);
-        // Update preview with latest code
+        // Update preview with latest code (accumulates across chunks)
         onCodeUpdate?.(accumulatedCodeRef.current);
       },
       onData: (payload) => {
@@ -111,9 +110,7 @@ export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
         setCurrentData(null);
         accumulatedThoughtRef.current = '';
         accumulatedCodeRef.current = '';
-        // Clear preview on error
-        onCodeUpdate?.(null);
-        onDataUpdate?.(null);
+        // Don't clear preview on error - keep existing code/data
       },
       onStreamComplete: () => {
         // Add final messages for thought and code if they exist
