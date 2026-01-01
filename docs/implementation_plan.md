@@ -26,7 +26,7 @@ Frontend:
   - Create a handler for text events and displays it
   - Create tests for starting and continuing a multi-turn conversation
 
-[ ] Step 2.1: The UI components
+[x] Step 2.1: The UI components
 
 - Create a handler for `data` event that parses and displays data in a table
 - Create a handler for `code` event that parses tsx code and acknowledge on frontend
