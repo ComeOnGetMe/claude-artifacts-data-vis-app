@@ -44,11 +44,15 @@ Frontend:
 
 ## Phase 2: The Sandbox (The "Artifact" UI)
 
-[ ] Step 3: Sandbox Component
+[x] Step 3: Sandbox Component
 
 Install react-runner in the frontend.
 
-Create a Preview component that takes a string of code and renders it inside an Error Boundary. Create a simple snippet to test this
+Create a Preview component that takes a string of code and renders it inside an Error Boundary on the right side of the frontend chat. Test with the sample code returned from backend which is introduced in 2.1
+
+[ ] Step 3.1: Render generated data and code together
+
+Update the sample code to be a simple Bar chart and the sample data to be a simple 2-column table of sales and regions; then make sure the generated UI can render the data accordingly
 
 [ ] Step 4: The Parser Utility
 
