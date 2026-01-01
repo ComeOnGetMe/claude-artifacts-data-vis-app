@@ -26,20 +26,21 @@ Frontend:
   - Create a handler for text events and displays it
   - Create tests for starting and continuing a multi-turn conversation
 
-[ ] Step 2.1: The UI component
+[ ] Step 2.1: The UI components
 
-- Create a handler for `data` event that stores the data payload directly (no URL fetching)
-- Create a handler for `code` event that accumulates code chunks
+- Create a handler for `data` event that parses and displays data in a table
+- Create a handler for `code` event that parses tsx code and acknowledge on frontend
+- Create a word-matching rule in backend to trigger data and code events to test above
+<!-- - Create a handler for `code` event that accumulates code chunks
 - Frontend infers code completion from event patterns:
   - When `code` events stop and a different event type arrives (e.g., `data` event)
   - When stream closes (all events sent)
-  - Optionally: timeout heuristic (no code events for 500ms)
 - Frontend tracks readiness independently: `hasCodeChunks` and `dataReady` (from arrival of data event)
 - Backend remains stateless - just streams events as they occur from LLM/tools
 - Rendering logic:
   - When code is complete but data not ready: render component with loading/placeholder state
   - When both are ready: render component with actual data
-  - When there is no UI code yet, render the data as a table by default 
+  - When there is no UI code yet, render the data as a table by default  -->
 
 ## Phase 2: The Sandbox (The "Artifact" UI)
 

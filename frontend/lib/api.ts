@@ -1,6 +1,7 @@
 /**
  * API client for communicating with the FastAPI backend
  */
+import type { StreamEvent, StreamCallbacks } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -9,17 +10,13 @@ export interface ChatMessage {
 }
 
 /**
- * Stream chat messages from the backend
+ * Stream chat messages from the backend with proper SSE event parsing
  * @param message The user's message
- * @param onChunk Callback for each chunk received
- * @param onComplete Callback when stream completes
- * @param onError Callback for errors
+ * @param callbacks Callbacks for different event types
  */
 export async function streamChat(
   message: string,
-  onChunk: (chunk: string) => void,
-  onComplete?: () => void,
-  onError?: (error: Error) => void
+  callbacks: StreamCallbacks
 ): Promise<void> {
   try {
     const response = await fetch(`${API_URL}/chat`, {
@@ -40,24 +37,62 @@ export async function streamChat(
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = '';
 
     try {
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) {
-          onComplete?.();
+          callbacks.onStreamComplete?.();
           break;
         }
 
-        const chunk = decoder.decode(value, { stream: true });
-        // Parse SSE format: "data: <content>\n\n"
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
         
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const content = line.slice(6); // Remove "data: " prefix
-            onChunk(content);
+        // Parse SSE format: "event: <type>\ndata: <json>\n\n"
+        const events = buffer.split('\n\n');
+        // Keep the last incomplete event in the buffer
+        buffer = events.pop() || '';
+
+        for (const eventBlock of events) {
+          if (!eventBlock.trim()) continue;
+
+          let eventType = 'message'; // default
+          let data = '';
+
+          const lines = eventBlock.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              data = line.slice(6).trim();
+            }
+          }
+
+          if (!data) continue;
+
+          try {
+            const parsedData: StreamEvent = JSON.parse(data);
+
+            // Route to appropriate callback based on event type
+            switch (parsedData.type) {
+              case 'thought':
+                callbacks.onThought?.(parsedData.content);
+                break;
+              case 'code':
+                callbacks.onCodeChunk?.(parsedData.content);
+                break;
+              case 'data':
+                callbacks.onData?.(parsedData.payload);
+                break;
+              case 'error':
+                callbacks.onError?.(parsedData);
+                break;
+            }
+          } catch (parseError) {
+            // If JSON parsing fails, treat as plain text chunk (backward compatibility)
+            console.warn('Failed to parse SSE event as JSON:', parseError);
           }
         }
       }
@@ -65,7 +100,10 @@ export async function streamChat(
       reader.releaseLock();
     }
   } catch (error) {
-    onError?.(error instanceof Error ? error : new Error(String(error)));
+    callbacks.onError?.({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

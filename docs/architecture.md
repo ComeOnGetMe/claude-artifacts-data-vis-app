@@ -26,7 +26,7 @@ The agent uses **PydanticAI** with tool-calling capabilities. The SQL translatio
 
 1. **User sends prompt** → Frontend POSTs to `/chat` endpoint with user message
 
-2. **Agent receives & analyzes** → PydanticAI agent processes the prompt:
+2. **Backend receives & send to LLM agent to analyzes** → PydanticAI agent processes the prompt:
    - Understands user intent (e.g., "Show sales by region")
    - **Translates natural language to SQL** (happens in agent's reasoning)
    - **Infers expected data structure** from the SQL query (column names, types, aggregation patterns)
@@ -43,7 +43,12 @@ The agent uses **PydanticAI** with tool-calling capabilities. The SQL translatio
    - Returns `QueryResult` with columns and rows
    - If actual data structure differs significantly, agent may stream code updates
 
-5. **Frontend renders progressively** → Frontend receives:
+5. **Backend sends SSE to frontend according to agent output**: 
+   - backend parses agent output and send different events to frontend accordingly:
+   - for output of data tool call, send data as a `data` event
+   - for UI code, send as `code` event
+
+6. **Frontend renders progressively** → Frontend receives:
    - UI code chunks (streamed as they're generated)
    - Data payload (streamed directly when query completes)
    - Frontend infers readiness from event patterns (no backend state tracking)

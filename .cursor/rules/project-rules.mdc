@@ -39,4 +39,4 @@ You are an expert full-stack engineer and architect. You are helping build a "Cl
 
 ## 6. Testing
 
-- For Python code, always use project virtual environment interpreter located at /backend/.venv/bin/python
+- When running backend tests, always `uv run`

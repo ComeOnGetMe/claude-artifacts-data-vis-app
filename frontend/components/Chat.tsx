@@ -2,19 +2,28 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { streamChat } from '@/lib/api';
+import type { QueryResult } from '@/lib/types';
+import DataTable from './DataTable';
 
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  type?: 'text' | 'data' | 'code';
+  data?: QueryResult;
+  code?: string;
 }
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [currentStreamContent, setCurrentStreamContent] = useState('');
+  const [currentThought, setCurrentThought] = useState('');
+  const [currentCodeChunks, setCurrentCodeChunks] = useState('');
+  const [currentData, setCurrentData] = useState<QueryResult | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const accumulatedThoughtRef = useRef('');
+  const accumulatedCodeRef = useRef('');
 
   const scrollToBottom = () => {
     if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
@@ -24,7 +33,7 @@ export default function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, currentStreamContent]);
+  }, [messages, currentThought, currentCodeChunks, currentData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,36 +46,43 @@ export default function Chat() {
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
+      type: 'text',
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsStreaming(true);
-    setCurrentStreamContent('');
+    setCurrentThought('');
+    setCurrentCodeChunks('');
+    setCurrentData(null);
+    accumulatedThoughtRef.current = '';
+    accumulatedCodeRef.current = '';
 
-    // Use a ref to track the accumulated content
-    let accumulatedContent = '';
-
-    await streamChat(
-      userMessage.content,
-      (chunk) => {
-        accumulatedContent += chunk;
-        setCurrentStreamContent(accumulatedContent);
+    await streamChat(userMessage.content, {
+      onThought: (content) => {
+        accumulatedThoughtRef.current = content;
+        setCurrentThought(content);
       },
-      () => {
-        // Stream complete - add final message
+      onCodeChunk: (chunk) => {
+        accumulatedCodeRef.current += chunk;
+        setCurrentCodeChunks(accumulatedCodeRef.current);
+      },
+      onData: (payload) => {
+        setCurrentData(payload);
+        // Add data message immediately
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: accumulatedContent,
+            content: 'Data received',
             timestamp: new Date(),
+            type: 'data',
+            data: payload,
           },
         ]);
-        setCurrentStreamContent('');
-        setIsStreaming(false);
+        setCurrentData(null);
       },
-      (error) => {
+      onError: (error) => {
         console.error('Stream error:', error);
         setMessages((prev) => [
           ...prev,
@@ -74,12 +90,51 @@ export default function Chat() {
             role: 'assistant',
             content: `Error: ${error.message}`,
             timestamp: new Date(),
+            type: 'text',
           },
         ]);
-        setCurrentStreamContent('');
         setIsStreaming(false);
-      }
-    );
+        setCurrentThought('');
+        setCurrentCodeChunks('');
+        setCurrentData(null);
+        accumulatedThoughtRef.current = '';
+        accumulatedCodeRef.current = '';
+      },
+      onStreamComplete: () => {
+        // Add final messages for thought and code if they exist
+        const newMessages: Message[] = [];
+        
+        if (accumulatedThoughtRef.current) {
+          newMessages.push({
+            role: 'assistant',
+            content: accumulatedThoughtRef.current,
+            timestamp: new Date(),
+            type: 'text',
+          });
+        }
+        
+        if (accumulatedCodeRef.current) {
+          newMessages.push({
+            role: 'assistant',
+            content: `Code received (${accumulatedCodeRef.current.length} characters)`,
+            timestamp: new Date(),
+            type: 'code',
+            code: accumulatedCodeRef.current,
+          });
+        }
+        
+        if (newMessages.length > 0) {
+          setMessages((prev) => [...prev, ...newMessages]);
+        }
+        
+        setCurrentThought('');
+        setCurrentCodeChunks('');
+        setCurrentData(null);
+        accumulatedThoughtRef.current = '';
+        accumulatedCodeRef.current = '';
+        setIsStreaming(false);
+      },
+    });
   };
 
   return (
@@ -99,7 +154,24 @@ export default function Chat() {
                   : 'bg-gray-200 text-gray-900'
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {message.type === 'data' && message.data ? (
+                <div>
+                  <p className="text-sm font-semibold mb-2">Data Table:</p>
+                  <DataTable data={message.data} />
+                </div>
+              ) : message.type === 'code' && message.code ? (
+                <div>
+                  <p className="text-sm font-semibold mb-2">Code Received:</p>
+                  <p className="text-xs text-gray-600 mb-2">
+                    {message.code.length} characters
+                  </p>
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto">
+                    <code>{message.code}</code>
+                  </pre>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              )}
               <p className="text-xs mt-1 opacity-70">
                 {message.timestamp.toLocaleTimeString()}
               </p>
@@ -107,13 +179,37 @@ export default function Chat() {
           </div>
         ))}
         
-        {isStreaming && currentStreamContent && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] rounded-lg p-3 bg-gray-200 text-gray-900">
-              <p className="whitespace-pre-wrap">{currentStreamContent}</p>
-              <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1" />
-            </div>
-          </div>
+        {/* Streaming indicators */}
+        {isStreaming && (
+          <>
+            {currentThought && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg p-3 bg-gray-200 text-gray-900">
+                  <p className="whitespace-pre-wrap">{currentThought}</p>
+                  <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1" />
+                </div>
+              </div>
+            )}
+            {currentCodeChunks && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg p-3 bg-gray-200 text-gray-900">
+                  <p className="text-sm font-semibold mb-2">Receiving code...</p>
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto">
+                    <code>{currentCodeChunks}</code>
+                  </pre>
+                  <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1" />
+                </div>
+              </div>
+            )}
+            {currentData && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg p-3 bg-gray-200 text-gray-900">
+                  <p className="text-sm font-semibold mb-2">Loading data...</p>
+                  <DataTable data={currentData} />
+                </div>
+              </div>
+            )}
+          </>
         )}
         
         <div ref={messagesEndRef} />
