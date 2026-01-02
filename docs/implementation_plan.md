@@ -97,19 +97,9 @@ Test tool use with prompt "describe schema of table 'test.parquet'" and verify t
 
 ## Phase 4: Agent integration
 
-[ ] Step 4.1: The Parser Utility
-
-Write a utility to extract code blocks from the AI's markdown response (e.g., extracting content between ```tsx blocks).
-
-Connect the Parser to the Preview window so code appears as it streams.
-
-Test if backend can extract code correctly
-
 [ ] Step 5: Real integration test
 
-Connects the LLM client with everything and simulate a real user interaction - translate prompt into SQL, run tool call, generate UI code, and renders.
-
-Test the end-to-end workflow with the following scenarios:
+Connects the LLM client with everything and simulate a full interaction. Test the end-to-end workflow with the following scenarios:
 
 1. Basic hello world multi-turn conversations
 2. Generate SQL
