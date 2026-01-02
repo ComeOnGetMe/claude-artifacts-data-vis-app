@@ -62,8 +62,9 @@ Update the sample code to be a simple Bar chart and the sample data to be a simp
   - Use Amazon Bedrock client together with PydanticAI
 - Create the "Base System Prompt" in FastAPI that instructs the LLM how to call the data tool and how to write UI code that renders the data.
 - Test both the client and the endpoint with basic prompts like "generate a SQL to calculate sales by region assuming a simple table schema"
+- Test UI code generation and verify if output is valid tsx code.
 
-[ ] Step 4.2: Backend Tool Definitions
+[ ] Step 4.1: Backend Tool use
 
 Define Pydantic models for tools:
 
@@ -72,7 +73,7 @@ Define Pydantic models for tools:
 
 Implement tool functions:
 
-- `run_sql(query, limit)` - Execute SQL and return `QueryResult` with columns and rows
+- `run_sql(query, limit)` - Use /query endpoint to execute SQL and return `QueryResult` with columns and rows
 - Tool returns `QueryResult` Pydantic model
 - All queries are assumed to return small result sets (streamed directly in SSE)
 
@@ -82,9 +83,7 @@ Register tools with PydanticAI agent:
 - Create tool implementations that call actual data APIs
 - Add tool descriptions for LLM to understand when to use each
 
-Test tool use with prompt "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'"
-
-Test UI code generation and verify if output is runnable.
+Test tool use with prompt "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'" and verify that the tool was called and the output is correct.
 
 ## Phase 4: Agent integration
 
