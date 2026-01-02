@@ -19,7 +19,7 @@ async def test_query_simple_select():
             
             response = await client.post(
                 endpoint,
-                json={"sql": "SELECT * FROM read_parquet('claude-artifacts-data-vis-app/*.parquet') limit 0;"}
+                json={"sql": "SELECT * FROM read_parquet('test.parquet') limit 0;"}
             )
             
             print(f"\n3. Response Status: {response.status_code}")

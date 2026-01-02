@@ -83,7 +83,7 @@ Register tools with PydanticAI agent:
 - Create tool implementations that call actual data APIs
 - Add tool descriptions for LLM to understand when to use each
 
-Test tool use with prompt "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'" and verify that the tool was called and the output is correct.
+Test tool use with prompt "describe schema of table 'test.parquet'" and verify that the tool was called and the output is correct.
 
 **Implementation Notes:**
 
@@ -113,7 +113,7 @@ Test the end-to-end workflow with the following scenarios:
 
 1. Basic hello world multi-turn conversations
 2. Generate SQL
-3. Tool use: ask to show top 5 rows from table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/part-00072-1617a3fc-7fe6-4606-928d-824fce963fe7-c000.snappy.parquet'. The result should be sent back as a data event and rendered as a plain table
+3. Tool use: ask to show top 5 rows from table 'test.parquet'. The result should be sent back as a data event and rendered as a plain table
    1. aggregation: ask to show total number of rows in above table
 4. UI generation: ask to generate UI code. The result should be rendered as an empty artifact 
 5. Rendering: ask to show total row count from above table and render as a bar chart

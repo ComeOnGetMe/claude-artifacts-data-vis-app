@@ -21,7 +21,7 @@ async def test_tool_use_schema_description():
     agent = create_agent()
     print("   ✓ Agent created successfully")
     
-    prompt = "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'"
+    prompt = "describe schema of table 'test.parquet'"
     print(f"\n2. Sending prompt: {prompt!r}")
     print("-" * 80)
     
