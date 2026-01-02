@@ -2,17 +2,70 @@
 LLM Client using PydanticAI with Amazon Bedrock
 """
 import os
-from typing import AsyncIterator, Dict, Any
+import httpx
+from typing import AsyncIterable, AsyncIterator, Dict, Any
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, FunctionToolResultEvent, PartDeltaEvent, PartEndEvent, RunContext, TextPart, TextPartDelta, ToolCallPart, ToolReturnPart, PartStartEvent, AgentStreamEvent
 from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
+from models import RunSQLTool, QueryResult
 
 
 class AgentResponse(BaseModel):
     """Response model for agent output"""
     content: str
     metadata: Dict[str, Any] = {}
+
+
+async def run_sql(tool: RunSQLTool) -> QueryResult:
+    """
+    Tool function to execute SQL queries against DuckDB via the /query/local_duckdb endpoint.
+    
+    This tool executes SQL queries and returns structured results.
+    Use this tool when you need to query data from DuckDB tables.
+    
+    Args:
+        tool: RunSQLTool instance with query, limit, and data_source
+        
+    Returns:
+        QueryResult with columns, rows, and row_count
+        
+    Raises:
+        ValueError: If SQL execution fails or HTTP request fails
+    """
+    # Get base URL from environment or default to localhost:8000
+    base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+    
+    # Apply limit if not already in query (only for SELECT statements)
+    final_query = tool.query
+    query_upper = tool.query.upper().strip()
+    # Only add LIMIT to SELECT queries, not DDL statements (CREATE, DROP, ALTER, etc.)
+    if (tool.limit > 0 and 
+        "LIMIT" not in query_upper and 
+        query_upper.startswith("SELECT")):
+        final_query = f"{tool.query.rstrip(';')} LIMIT {tool.limit}"
+    
+    # Make HTTP request to /query/local_duckdb endpoint
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{base_url}/query/local_duckdb",
+                json={"sql": final_query}
+            )
+            response.raise_for_status()
+            result_data = response.json()
+            return QueryResult(**result_data)
+        except httpx.HTTPStatusError as e:
+            # Extract error message from response
+            error_detail = "Unknown error"
+            try:
+                error_data = e.response.json()
+                error_detail = error_data.get("detail", str(e))
+            except Exception:
+                error_detail = str(e)
+            raise ValueError(f"SQL execution error: {error_detail}")
+        except httpx.RequestError as e:
+            raise ValueError(f"Failed to connect to query endpoint: {str(e)}")
 
 
 def get_base_system_prompt() -> str:
@@ -29,7 +82,8 @@ def get_base_system_prompt() -> str:
 1. **SQL Query Generation**: When users ask questions about data, analyze their request and determine what SQL query is needed.
    - Translate natural language requests into SQL queries
    - Always include appropriate WHERE clauses and LIMITs (default limit: 1000 rows)
-   - Use the run_sql() tool to execute queries
+   - Use the run_sql() tool to execute queries against DuckDB
+   - The run_sql tool accepts: query (SQL string), limit (max rows, default 1000), data_source (always "duckdb")
 
 2. **UI Code Generation**: Generate React/TypeScript code for data visualizations immediately after determining the SQL query structure.
    - Analyze the expected data structure from the SQL query (column names, types, aggregation patterns)
@@ -152,13 +206,60 @@ def create_agent() -> Agent:
         settings=model_settings
     )
     
-    # Create agent with system prompt
+    # Create agent with system prompt and tools
     agent = Agent(
         model=model,
         system_prompt=get_base_system_prompt(),
+        tools=[run_sql],
     )
     
     return agent
+
+
+async def handle_agent_events(event_stream: AsyncIterable[AgentStreamEvent]) -> AsyncIterator[Dict[str, Any]]:
+    thought_buffer = ""
+    async for event in event_stream:
+        if isinstance(event, PartStartEvent):
+            if isinstance(event.part, TextPart):  # start of thought
+                thought_buffer = event.part.content
+                yield {
+                    "type": "thought",
+                    "content": thought_buffer
+                }
+        elif isinstance(event, PartDeltaEvent):
+            if isinstance(event.delta, TextPartDelta):  # continuation of thought
+                delta = event.delta.content_delta
+                thought_buffer += delta
+                yield {
+                    "type": "thought",
+                    "content": thought_buffer
+                }
+        elif isinstance(event, FunctionToolResultEvent):  # end of tool call
+            tool_result = event.result.content
+            if isinstance(tool_result, QueryResult):
+                yield {
+                    "type": "data",
+                    "payload": {
+                        "columns": tool_result.columns,
+                        "rows": tool_result.rows,
+                        "row_count": tool_result.row_count
+                    }
+                }
+        elif isinstance(event, PartEndEvent):
+            if isinstance(event.part, TextPart):  # complete thought, parse code blocks
+                code_blocks = _extract_code_blocks(event.part.content)
+                for code_block in code_blocks:
+                    yield {
+                        "type": "code",
+                        "language": code_block.get("language", "tsx"),
+                        "content": code_block.get("content", "")
+                    }
+            if isinstance(event.part, ToolCallPart):  # complete tool call, notify tool call
+                yield {
+                    "type": "thought",
+                    "content": f"Calling tool: {event.part.tool_name} with args: {event.part.args}"
+                }
+        # TODO: avoid sending code blocks as thought? 
 
 
 async def stream_agent_response(agent: Agent, user_message: str) -> AsyncIterator[Dict[str, Any]]:
@@ -172,32 +273,10 @@ async def stream_agent_response(agent: Agent, user_message: str) -> AsyncIterato
     - {"type": "error", "message": "..."}
     """
     try:
-        # Accumulate full response text for parsing
-        full_response = ""
-        
         # Run agent with streaming - run_stream returns a context manager
-        async with agent.run_stream(user_message) as stream_result:
-            # Stream text chunks as they arrive
-            async for chunk in stream_result.stream_text():
-                if chunk:
-                    full_response += chunk
-                    # Yield incremental thought updates as we receive them
-                    # (We'll parse code blocks from full_response later)
-                    yield {
-                        "type": "thought",
-                        "content": chunk
-                    }
-        
-        # After streaming completes, parse code blocks from full response
-        # This is a simple approach - in production, you might want to parse incrementally
-        code_blocks = _extract_code_blocks(full_response)
-        for code_block in code_blocks:
-            yield {
-                "type": "code",
-                "language": code_block.get("language", "tsx"),
-                "content": code_block.get("content", "")
-            }
-    
+        async for event in handle_agent_events(agent.run_stream_events(user_message)):
+            yield event
+
     except Exception as e:
         yield {
             "type": "error",

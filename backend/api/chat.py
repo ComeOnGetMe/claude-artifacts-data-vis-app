@@ -6,20 +6,12 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Any
 from agents.llm_client import create_agent, stream_agent_response
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 class ChatMessage(BaseModel):
     """Chat message model"""
     message: str
-
-
-class QueryResult(BaseModel):
-    """Query result model for data events"""
-    columns: List[str]
-    rows: List[List[Any]]
-    row_count: int
 
 
 @router.post("")

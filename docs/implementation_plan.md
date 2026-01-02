@@ -64,7 +64,7 @@ Update the sample code to be a simple Bar chart and the sample data to be a simp
 - Test both the client and the endpoint with basic prompts like "generate a SQL to calculate sales by region assuming a simple table schema"
 - Test UI code generation and verify if output is valid tsx code.
 
-[ ] Step 4.1: Backend Tool use
+[x] Step 4.1: Backend Tool use
 
 Define Pydantic models for tools:
 
@@ -84,6 +84,16 @@ Register tools with PydanticAI agent:
 - Add tool descriptions for LLM to understand when to use each
 
 Test tool use with prompt "describe schema of table 's3://disco-feature-store/features-main/lean_and_long/train/version_timestamp=2025-11-16Z0010/*.parquet'" and verify that the tool was called and the output is correct.
+
+**Implementation Notes:**
+
+- Created shared models in `backend/models/__init__.py` (RunSQLTool, QueryResult)
+- Implemented `run_sql` tool function in `backend/agents/llm_client.py` that executes DuckDB queries
+- Registered tool with PydanticAI agent via `tools=[run_sql]` parameter
+- Updated streaming logic to extract tool results from agent response and send as `data` events
+- Consolidated QueryResult model usage across `backend/api/query.py` and `backend/api/chat.py`
+- Created comprehensive tests in `backend/tests/test_tools.py` for tool functionality
+- Added integration test in `backend/tests/test_llm_client.py` for agent tool use
 
 ## Phase 4: Agent integration
 

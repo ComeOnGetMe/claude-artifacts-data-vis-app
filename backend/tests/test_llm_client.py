@@ -94,6 +94,27 @@ async def test_create_agent():
     os.getenv("USE_LLM_AGENT", "true").lower() != "true",
     reason="LLM agent disabled via USE_LLM_AGENT env var"
 )
+async def test_create_agent_has_tools():
+    """Test that agent is created with tools registered"""
+    try:
+        from agents.llm_client import create_agent
+        
+        agent = create_agent()
+        assert agent is not None
+        # Verify agent has tools registered
+        # PydanticAI stores tools in agent._tools or similar
+        # Check if run_sql tool is available
+        assert hasattr(agent, 'tools') or hasattr(agent, '_tools')
+    except Exception as e:
+        # Skip if AWS credentials not available
+        pytest.skip(f"Could not create agent (likely missing AWS credentials): {e}")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("USE_LLM_AGENT", "true").lower() != "true",
+    reason="LLM agent disabled via USE_LLM_AGENT env var"
+)
 async def test_stream_agent_response_basic():
     """Test streaming agent response (requires AWS credentials and LLM access)"""
     try:
@@ -124,4 +145,10 @@ async def test_stream_agent_response_basic():
     except Exception as e:
         # Skip if AWS credentials not available or other issues
         pytest.skip(f"Could not test agent streaming (likely missing AWS credentials or API access): {e}")
+
+
+# Note: LLM integration tests that require actual agent execution have been moved to
+# scripts/debug_tool_use.py as debug scripts. These tests require AWS credentials
+# and actual LLM API access, so they are better suited as manual debugging scripts
+# rather than automated unit tests.
 

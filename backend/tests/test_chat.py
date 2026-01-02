@@ -104,9 +104,8 @@ export default function Visualization({ data }) {
 
 
 @pytest.mark.asyncio
-@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
-@patch('api.chat._llm_agent', new_callable=MagicMock)
-async def test_chat_endpoint_streams_thought_event(mock_agent, mock_stream):
+@patch('agents.llm_client.stream_agent_response', side_effect=mock_stream_agent_response)
+async def test_chat_endpoint_streams_thought_event(mock_stream):
     """Test that /chat endpoint streams thought events for regular messages"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -147,9 +146,8 @@ async def test_chat_endpoint_streams_thought_event(mock_agent, mock_stream):
 
 
 @pytest.mark.asyncio
-@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
-@patch('api.chat._llm_agent', new_callable=MagicMock)
-async def test_chat_endpoint_streams_data_event(mock_agent, mock_stream):
+@patch('agents.llm_client.stream_agent_response', side_effect=mock_stream_agent_response)
+async def test_chat_endpoint_streams_data_event(mock_stream):
     """Test that /chat endpoint streams data events when message contains 'data'"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -192,9 +190,8 @@ async def test_chat_endpoint_streams_data_event(mock_agent, mock_stream):
 
 
 @pytest.mark.asyncio
-@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
-@patch('api.chat._llm_agent', new_callable=MagicMock)
-async def test_chat_endpoint_streams_code_event(mock_agent, mock_stream):
+@patch('agents.llm_client.stream_agent_response', side_effect=mock_stream_agent_response)
+async def test_chat_endpoint_streams_code_event(mock_stream):
     """Test that /chat endpoint streams code events when message contains 'code'"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
@@ -234,9 +231,8 @@ async def test_chat_endpoint_streams_code_event(mock_agent, mock_stream):
 
 
 @pytest.mark.asyncio
-@patch('api.chat.stream_agent_response', side_effect=mock_stream_agent_response)
-@patch('api.chat._llm_agent', new_callable=MagicMock)
-async def test_chat_endpoint_with_different_messages(mock_agent, mock_stream):
+@patch('agents.llm_client.stream_agent_response', side_effect=mock_stream_agent_response)
+async def test_chat_endpoint_with_different_messages(mock_stream):
     """Test that /chat endpoint handles different message inputs"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         test_messages = [

@@ -5,7 +5,7 @@ import asyncio
 import duckdb
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Any
+from models import QueryResult
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -13,13 +13,6 @@ router = APIRouter(prefix="/query", tags=["query"])
 class QueryRequest(BaseModel):
     """Query request model"""
     sql: str
-
-
-class QueryResult(BaseModel):
-    """Query result model"""
-    columns: List[str]
-    rows: List[List[Any]]
-    row_count: int
 
 
 def _execute_duckdb_query(sql: str) -> dict:
