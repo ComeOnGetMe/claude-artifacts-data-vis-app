@@ -35,6 +35,9 @@ export default function Preview({ code, data }: PreviewProps) {
     });
   }
 
+  // Also keep the original data structure for components that expect { rows, columns } format
+  const originalData = data;
+
   // Strip import statements from the code since react-runner doesn't handle them
   // react-runner needs all dependencies in scope, not as imports
   let processedCode = code;
@@ -43,11 +46,15 @@ export default function Preview({ code, data }: PreviewProps) {
   // Match import statements more comprehensively
   processedCode = processedCode.replace(/import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+)?['"]react['"];?\s*/g, '');
   processedCode = processedCode.replace(/import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+)?['"]recharts['"];?\s*/g, '');
-  processedCode = processedCode.replace(/import\s+.*?from\s+['"]@\/components\/ui\/.*?['"];?\s*/g, '');
+  // Strip all @/ imports (components, lib, etc.)
+  processedCode = processedCode.replace(/import\s+.*?from\s+['"]@\/.*?['"];?\s*/g, '');
   
   // Clean up any extra blank lines left by removed imports
   processedCode = processedCode.replace(/\n{3,}/g, '\n\n').trim();
-
+  
+  // Detect if component expects QueryResult format ({ rows, columns }) or transformed array format
+  const expectsQueryResultFormat = processedCode.includes('data.rows') || processedCode.includes('data.columns');
+  
   // Wrap the component code to pass data as a prop
   // The backend generates: export default function Component({ data })
   // react-runner renders the default export, so we wrap it to pass the data prop
@@ -63,12 +70,14 @@ export default function Preview({ code, data }: PreviewProps) {
       // Replace export default with just the function definition
       const functionCode = processedCode.replace(/export default /, '');
       // Use JSX syntax for wrapping (react-runner handles JSX)
+      // Pass originalData if component expects QueryResult format, otherwise transformedData
+      const dataToPass = expectsQueryResultFormat ? 'originalData' : 'transformedData';
       wrappedCode = `
 ${functionCode}
 
 // Wrap to pass data prop
 const WrappedComponent = () => {
-  return <${componentName} data={transformedData || null} />;
+  return <${componentName} data={${dataToPass}} params={undefined} />;
 };
 
 export default WrappedComponent;
@@ -111,8 +120,15 @@ export default WrappedComponent;
               Legend: Recharts.Legend,
               // Also provide the namespace for any other components
               recharts: Recharts,
+              // Utility functions
+              formatNumber: (value: number) => {
+                if (typeof value !== 'number') return String(value);
+                return value.toLocaleString();
+              },
+              // Data in both formats
               data: transformedData || null,
               transformedData: transformedData || null,
+              originalData: originalData || null,
             }}
           />
         </div>

@@ -5,7 +5,7 @@ import os
 import httpx
 from typing import AsyncIterable, AsyncIterator, Dict, Any
 from pydantic import BaseModel
-from pydantic_ai import Agent, FunctionToolResultEvent, PartDeltaEvent, PartEndEvent, RunContext, TextPart, TextPartDelta, ToolCallPart, ToolReturnPart, PartStartEvent, AgentStreamEvent
+from pydantic_ai import Agent, FunctionToolResultEvent, PartDeltaEvent, PartEndEvent, TextPart, TextPartDelta, ToolCallPart, PartStartEvent, AgentStreamEvent
 from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
 from models import RunSQLTool, QueryResult
@@ -95,7 +95,7 @@ def get_base_system_prompt() -> str:
 
 ### Allowed Libraries (ONLY use these):
 - **Recharts**: For charts (BarChart, LineChart, PieChart, AreaChart, ScatterChart, ComposedChart)
-- **Shadcn UI**: For layout (Card, CardHeader, CardTitle, CardContent, Table, Badge, Alert, Progress, Skeleton, Button, Slider, Switch, Tabs)
+- **Shadcn UI**: For layout (Table, Alert, Progress, Skeleton, Button, Slider, Switch, Tabs)
 - **Lucide React**: For icons (TrendingUp, AlertCircle, Database, Download, etc.)
 - **Tailwind CSS**: For styling
 
@@ -104,41 +104,51 @@ Your generated component MUST follow this exact structure:
 
 ```tsx
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 /**
- * @param {Array} data - The dataset returned from the Python backend
+ * @param {Object} data - The dataset returned from the Python backend
+ *   Format: { columns: string[], rows: any[][] }
+ *   Example: { columns: ['region', 'sales'], rows: [['North', '1000'], ['South', '2000']] }
  * @param {Object} params - User-defined parameters for customization (optional)
  */
 export default function GeneratedViz({ data, params }) {
-  if (!data || data.length === 0) {
+  // IMPORTANT: data is an object with {rows, columns}, NOT an array
+  // Always check data.rows, not data.length
+  if (!data || !data.rows || data.rows.length === 0) {
     return <div className="p-4 text-center">No data available to visualize.</div>;
   }
 
-  // Transform data if needed (backend returns {columns: [], rows: []})
-  // Convert to array of objects for Recharts
+  // Transform data from {columns: [], rows: []} format to array of objects for Recharts
+  // IMPORTANT: Convert numeric strings to numbers for proper chart rendering
   const chartData = data.rows.map(row => {
     const obj = {};
     data.columns.forEach((col, idx) => {
-      obj[col] = row[idx];
+      const value = row[idx];
+      // Convert string numbers to actual numbers (e.g., "1000" -> 1000)
+      // This is critical for Recharts to render numeric values correctly
+      if (typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(value)) {
+        obj[col] = parseFloat(value);
+      } else {
+        obj[col] = value; // Keep non-numeric strings and already-numeric values as-is
+      }
     });
     return obj;
   });
 
   return (
-    <Card className="w-full h-full">
-      <CardHeader>
-        <CardTitle>{params?.title || 'Data Visualization'}</CardTitle>
-      </CardHeader>
-      <CardContent className="h-[400px]">
+    <div className="w-full h-full p-4">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold">{params?.title || 'Data Visualization'}</h2>
+      </div>
+      <div className="h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
             {/* Your visualization logic here */}
           </BarChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 ```
@@ -165,7 +175,11 @@ User: "Show me sales by region for Q1 2024"
 Your response:
 1. [Thought] "I need to query sales data grouped by region for Q1 2024. I'll generate a SQL query and create a bar chart visualization."
 2. [SQL] "SELECT region, SUM(amount) as total_sales FROM sales WHERE date >= '2024-01-01' AND date < '2024-04-01' GROUP BY region ORDER BY total_sales DESC"
-3. [Code] Generate React component with BarChart expecting columns: ['region', 'total_sales']
+3. [Code] Generate React component with BarChart expecting data format:
+   - columns: ['region', 'total_sales']
+   - rows: [['North', '50000'], ['South', '75000'], ...]
+   - Component must check: `if (!data || !data.rows || data.rows.length === 0)`
+   - Component must convert numeric strings to numbers in the transformation step
 """
 
 

@@ -70,11 +70,13 @@ export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
         accumulatedThoughtRef.current = content;
         setCurrentThought(content);
       },
-      onCodeChunk: (chunk) => {
-        accumulatedCodeRef.current += chunk;
-        setCurrentCodeChunks(accumulatedCodeRef.current);
-        // Update preview with latest code (accumulates across chunks)
-        onCodeUpdate?.(accumulatedCodeRef.current);
+      onCodeChunk: (code) => {
+        // Backend sends complete code blocks, not chunks
+        // Each code event contains the full UI code
+        accumulatedCodeRef.current = code;
+        setCurrentCodeChunks(code);
+        // Update preview with complete code
+        onCodeUpdate?.(code);
       },
       onData: (payload) => {
         setCurrentData(payload);
@@ -95,11 +97,12 @@ export default function Chat({ onCodeUpdate, onDataUpdate }: ChatProps = {}) {
       },
       onError: (error) => {
         console.error('Stream error:', error);
+        const errorMessage = error?.message || error?.toString() || 'Unknown stream error';
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: `Error: ${error.message}`,
+            content: `Error: ${errorMessage}`,
             timestamp: new Date(),
             type: 'text',
           },

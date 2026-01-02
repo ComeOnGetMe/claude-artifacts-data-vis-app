@@ -12,7 +12,7 @@ Elements: XAxis, YAxis, CartesianGrid, Tooltip, Legend, Bar, Line, Area, Cell.
 
 The following pre-installed components are available. Use them for layout and data presentation:
 
-Data Display: Card, CardHeader, CardTitle, CardContent, Table, Badge.
+Data Display: Table.
 
 Feedback: Alert, Progress, Skeleton.
 
@@ -37,7 +37,6 @@ When generating a component, the Agent must follow this exact template:
 ```TypeScript
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 /**
@@ -50,18 +49,18 @@ export default function GeneratedViz({ data, params }) {
   }
 
   return (
-    <Card className="w-full h-full">
-      <CardHeader>
-        <CardTitle>{params?.title || 'Data Visualization'}</CardTitle>
-      </CardHeader>
-      <CardContent className="h-[400px]">
+    <div className="w-full h-full p-4">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold">{params?.title || 'Data Visualization'}</h2>
+      </div>
+      <div className="h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
             {/* Viz Logic Here */}
           </BarChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 ```
