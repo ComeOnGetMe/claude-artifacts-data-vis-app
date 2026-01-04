@@ -1,0 +1,45 @@
+# Production overrides
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  backend:
+    # Production uses regular Dockerfile (code is copied, not mounted)
+    build:
+      dockerfile: Dockerfile
+    # No volumes in production - code is baked into image
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000
+    # Production-specific settings
+    restart: always
+    # Uncomment to add resource limits in production
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+  frontend:
+    # Production uses regular Dockerfile (code is copied, not mounted)
+    build:
+      dockerfile: Dockerfile
+    # No volumes in production - code is baked into image
+    command: npm run start
+    # Production-specific settings
+    restart: always
+    # Uncomment to add resource limits in production
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+  postgres:
+    restart: always
+    # Production: use secrets for passwords instead of environment variables
+    # Consider using Docker secrets or external secret management
+

@@ -1,0 +1,28 @@
+# Development overrides - automatically loaded by docker-compose
+# This file is for local development with live reloading
+# Usage: docker-compose up (automatically includes this file)
+
+services:
+  backend:
+    build:
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for live reloading
+      - ./backend:/app
+      # Exclude Python cache and virtual environment from mount
+      - /app/.venv
+      - /app/__pycache__
+      - /app/**/__pycache__
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for live reloading
+      - ./frontend:/app
+      # Exclude node_modules and .next from mount (use container's installed versions)
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
